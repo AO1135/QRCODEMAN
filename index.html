@@ -11,7 +11,9 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: 'Segoe UI', 'Helvetica Neue', Arial, 'Hiragino Sans', sans-serif;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    background: url('karupasu.jpg') repeat center center fixed;
+background-size: 200px auto;
+
     min-height: 100vh;
     color: #e0e0e0;
     display: flex;
@@ -31,7 +33,8 @@
     padding: 10px 0;
   }
   .main-card {
-    background: rgba(255,255,255,0.05);
+    background: #c0392b;
+
     border: 1px solid rgba(255,255,255,0.1);
     border-radius: 20px;
     padding: 30px;
@@ -572,17 +575,9 @@ async function startCamera() {
   const videoContainer = document.getElementById('video-container');
   const stopBtn = document.getElementById('stop-btn');
 
-  // HTTPS チェック（localhost は除外）
-  if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-    showToast('⚠️ カメラはHTTPS環境が必要です');
-    return;
-  }
+  
 
-  // mediaDevices 未対応チェック
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    showToast('❌ このブラウザはカメラに対応していません');
-    return;
-  }
+ 
 
   try {
     // スマホ背面カメラ優先（exact で失敗したら任意カメラにフォールバック）
@@ -644,6 +639,62 @@ async function startCamera() {
   }
 }
 
+
+function stopCamera() {
+  if (codeReader) {
+    try { codeReader.reset(); } catch(e) {}
+    codeReader = null;
+  }
+  if (videoStream) {
+    videoStream.getTracks().forEach(t => t.stop());
+    videoStream = null;
+  }
+  const videoEl = document.getElementById('video');
+  videoEl.srcObject = null;
+  document.getElementById('video-container').style.display = 'none';
+  document.getElementById('stop-btn').style.display = 'none';
+}
+
+function readFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const hints = new Map();
+      const formats = [];
+      if (readType === 'qr') {
+        formats.push(ZXing.BarcodeFormat.QR_CODE);
+      } else {
+        formats.push(
+          ZXing.BarcodeFormat.CODE_128,
+          ZXing.BarcodeFormat.EAN_13,
+          ZXing.BarcodeFormat.EAN_8,
+          ZXing.BarcodeFormat.UPC_A,
+          ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.ITF,
+          ZXing.BarcodeFormat.DATA_MATRIX
+        );
+      }
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+      const multiReader = new ZXing.BrowserMultiFormatReader(hints);
+      multiReader.decodeFromCanvas(canvas).then(result => {
+        showResult(result.getText());
+      }).catch(() => {
+        showToast('❌ コードを読み取れませんでした');
+      });
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
 
 function showResult(text) {
   document.getElementById('result-text').textContent = text;
