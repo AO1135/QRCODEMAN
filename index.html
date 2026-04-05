@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR・バーコード ジェネレーター＆リーダー</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, 'Hiragino Sans', sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+    color: #e0e0e0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  h1 {
+    font-size: 1.8rem;
+    margin-bottom: 30px;
+    text-align: center;
+    background: linear-gradient(90deg, #00d2ff, #a855f7);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    padding: 10px 0;
+  }
+  .main-card {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 20px;
+    padding: 30px;
+    width: 100%;
+    max-width: 650px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .mode-selector {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 30px;
+    justify-content: center;
+  }
+  .mode-btn {
+    flex: 1;
+    padding: 15px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-radius: 12px;
+    background: rgba(255,255,255,0.05);
+    color: #e0e0e0;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+  }
+  .mode-btn:hover { border-color: #00d2ff; background: rgba(0,210,255,0.1); }
+  .mode-btn.active {
+    border-color: #a855f7;
+    background: linear-gradient(135deg, rgba(0,210,255,0.2), rgba(168,85,247,0.2));
+    color: #fff;
+    font-weight: bold;
+  }
+  .mode-btn .icon { font-size: 2rem; display: block; margin-bottom: 6px; }
+  .section { display: none; }
+  .section.active { display: block; }
+  label { display: block; margin-bottom: 6px; font-size: 0.9rem; color: #aaa; }
+  input[type="text"], select, textarea {
+    width: 100%;
+    padding: 12px 15px;
+    border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.07);
+    color: #e0e0e0;
+    font-size: 1rem;
+    outline: none;
+    transition: border 0.3s;
+    margin-bottom: 18px;
+  }
+  input[type="text"]:focus, select:focus, textarea:focus { border-color: #00d2ff; }
+  select option { background: #1a1a2e; color: #e0e0e0; }
+  .generate-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    border: none;
+    background: linear-gradient(90deg, #00d2ff, #a855f7);
+    color: #fff;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: opacity 0.3s, transform 0.2s;
+    margin-bottom: 25px;
+  }
+  .generate-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .generate-btn:active { transform: translateY(0); }
+  .output-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+  }
+  #qr-output, #barcode-output {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    display: inline-block;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  }
+  #barcode-output svg, #barcode-output canvas { max-width: 100%; }
+  .action-btns {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .action-btn {
+    padding: 10px 22px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.07);
+    color: #e0e0e0;
+    font-size: 0.95rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .action-btn:hover { background: rgba(0,210,255,0.15); border-color: #00d2ff; color: #fff; }
+  .notice {
+    font-size: 0.82rem;
+    color: #f87171;
+    background: rgba(248,113,113,0.1);
+    border: 1px solid rgba(248,113,113,0.2);
+    border-radius: 8px;
+    padding: 8px 14px;
+    text-align: center;
+  }
+  .type-toggle {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .type-btn {
+    flex: 1;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.05);
+    color: #aaa;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.3s;
+    font-size: 0.95rem;
+  }
+  .type-btn.active {
+    border-color: #a855f7;
+    background: rgba(168,85,247,0.2);
+    color: #fff;
+    font-weight: bold;
+  }
+  .type-btn:hover { border-color: #00d2ff; }
+  .reader-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+  #video-container {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 2px solid rgba(168,85,247,0.5);
+    box-shadow: 0 0 20px rgba(168,85,247,0.3);
+    background: #000;
+    display: none;
+  }
+  #video-container video { width: 100%; display: block; }
+  .scan-line {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #00d2ff, transparent);
+    animation: scan 2s linear infinite;
+  }
+  @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+  #result-box {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 10px;
+    padding: 16px;
+    min-height: 80px;
+    word-break: break-all;
+    display: none;
+  }
+  .result-label { font-size: 0.82rem; color: #aaa; margin-bottom: 8px; }
+  .result-text { font-size: 1.05rem; color: #00d2ff; font-weight: bold; }
+  .copy-result-btn {
+    padding: 8px 18px;
+    border-radius: 8px;
+    border: 1px solid rgba(0,210,255,0.3);
+    background: rgba(0,210,255,0.1);
+    color: #00d2ff;
+    cursor: pointer;
+    font-size: 0.9rem;
+    transition: all 0.3s;
+    display: none;
+  }
+  .copy-result-btn:hover { background: rgba(0,210,255,0.2); }
+  .upload-btn {
+    width: 100%;
+    padding: 14px;
+    border-radius: 10px;
+    border: 2px dashed rgba(255,255,255,0.2);
+    background: rgba(255,255,255,0.04);
+    color: #aaa;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+  }
+  .upload-btn:hover { border-color: #a855f7; color: #e0e0e0; background: rgba(168,85,247,0.1); }
+  #file-input { display: none; }
+  .stop-btn {
+    padding: 10px 22px;
+    border-radius: 8px;
+    border: 1px solid rgba(248,113,113,0.4);
+    background: rgba(248,113,113,0.1);
+    color: #f87171;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.3s;
+    display: none;
+  }
+  .stop-btn:hover { background: rgba(248,113,113,0.2); }
+  .divider {
+    text-align: center;
+    color: #555;
+    font-size: 0.85rem;
+    margin: 5px 0;
+  }
+  .toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: linear-gradient(90deg, #00d2ff, #a855f7);
+    color: #fff;
+    padding: 12px 24px;
+    border-radius: 50px;
+    font-size: 0.95rem;
+    font-weight: bold;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    transition: transform 0.4s ease;
+    z-index: 999;
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  @media (max-width: 480px) {
+    h1 { font-size: 1.3rem; }
+    .main-card { padding: 20px 15px; }
+    .mode-btn .icon { font-size: 1.5rem; }
+    .mode-btn { font-size: 0.9rem; padding: 12px 8px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>📱 QR・バーコード ジェネレーター＆リーダー</h1>
+
+<div class="main-card">
+
+  <!-- モード選択 -->
+  <div class="mode-selector">
+    <button class="mode-btn active" id="btn-create" onclick="switchMode('create')">
+      <span class="icon">✨</span>作る
+    </button>
+    <button class="mode-btn" id="btn-read" onclick="switchMode('read')">
+      <span class="icon">📷</span>読み取る
+    </button>
+  </div>
+
+  <!-- ===== 作るセクション ===== -->
+  <div class="section active" id="section-create">
+    <label>テキスト入力（日本語・英語・数字）</label>
+    <input type="text" id="input-text" placeholder="例: Hello World / こんにちは / 1234567890" oninput="onInputChange()">
+
+    <label>生成タイプ</label>
+    <div class="type-toggle">
+      <div class="type-btn active" id="create-qr-btn" onclick="setCreateType('qr')">QRコード</div>
+      <div class="type-btn" id="create-bar-btn" onclick="setCreateType('barcode')">バーコード</div>
+    </div>
+
+    <div id="barcode-format-wrap" style="display:none;">
+      <label>バーコード形式</label>
+      <select id="barcode-format">
+        <option value="CODE128">CODE128（英数字・記号）</option>
+        <option value="EAN13">EAN-13（13桁数字）</option>
+        <option value="EAN8">EAN-8（8桁数字）</option>
+        <option value="UPC">UPC-A（12桁数字）</option>
+        <option value="CODE39">CODE39（英数字）</option>
+        <option value="ITF14">ITF-14（14桁数字）</option>
+      </select>
+    </div>
+
+    <div id="numeric-notice" class="notice" style="display:none; margin-bottom:16px;">
+      ⚠️ バーコードの一部形式は数字のみ対応しています。入力内容を確認してください。
+    </div>
+
+    <button class="generate-btn" onclick="generate()">🚀 生成する</button>
+
+    <!-- QR出力 -->
+    <div class="output-area" id="qr-output-wrap" style="display:none;">
+      <div id="qr-output"></div>
+      <div class="action-btns">
+        <button class="action-btn" onclick="copyCode('qr')">📋 コピー</button>
+        <button class="action-btn" onclick="downloadCode('qr')">⬇️ ダウンロード</button>
+      </div>
+    </div>
+
+    <!-- バーコード出力 -->
+    <div class="output-area" id="barcode-output-wrap" style="display:none;">
+      <div id="barcode-output"><svg id="barcode-svg"></svg></div>
+      <div class="action-btns">
+        <button class="action-btn" onclick="copyCode('barcode')">📋 コピー</button>
+        <button class="action-btn" onclick="downloadCode('barcode')">⬇️ ダウンロード</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 読み取るセクション ===== -->
+  <div class="section" id="section-read">
+    <label>読み取りタイプ</label>
+    <div class="type-toggle">
+      <div class="type-btn active" id="read-qr-btn" onclick="setReadType('qr')">QRコード</div>
+      <div class="type-btn" id="read-bar-btn" onclick="setReadType('barcode')">バーコード</div>
+    </div>
+
+    <div class="reader-area">
+      <button class="generate-btn" onclick="startCamera()" id="camera-start-btn">📷 カメラで読み取る</button>
+
+      <div id="video-container">
+        <video id="video" playsinline muted></video>
+        <div class="scan-line"></div>
+      </div>
+
+      <button class="stop-btn" id="stop-btn" onclick="stopCamera()">■ カメラを停止</button>
+
+      <div class="divider">— または —</div>
+
+      <label class="upload-btn" for="file-input">
+        🖼️ 画像ファイルをアップロード
+      </label>
+      <input type="file" id="file-input" accept="image/*" onchange="readFromFile(event)">
+
+      <div id="result-box">
+        <div class="result-label">読み取り結果：</div>
+        <div class="result-text" id="result-text"></div>
+      </div>
+      <button class="copy-result-btn" id="copy-result-btn" onclick="copyResult()">📋 結果をコピー</button>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== グローバル変数 =====
+let currentMode = 'create';
+let createType = 'qr';
+let readType = 'qr';
+let codeReader = null;
+let videoStream = null;
+let qrCodeInstance = null;
+
+// ===== モード切替 =====
+function switchMode(mode) {
+  currentMode = mode;
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('section-' + mode).classList.add('active');
+  document.getElementById('btn-' + mode).classList.add('active');
+  if (mode !== 'read') stopCamera();
+}
+
+// ===== 作るセクション =====
+function setCreateType(type) {
+  createType = type;
+  document.getElementById('create-qr-btn').classList.toggle('active', type === 'qr');
+  document.getElementById('create-bar-btn').classList.toggle('active', type === 'barcode');
+  document.getElementById('barcode-format-wrap').style.display = type === 'barcode' ? 'block' : 'none';
+  document.getElementById('qr-output-wrap').style.display = 'none';
+  document.getElementById('barcode-output-wrap').style.display = 'none';
+  onInputChange();
+}
+
+function onInputChange() {
+  const text = document.getElementById('input-text').value;
+  const notice = document.getElementById('numeric-notice');
+  if (createType === 'barcode' && text.length > 0) {
+    const fmt = document.getElementById('barcode-format').value;
+    const numericFormats = ['EAN13','EAN8','UPC','ITF14'];
+    if (numericFormats.includes(fmt) && /[^0-9]/.test(text)) {
+      notice.style.display = 'block';
+    } else {
+      notice.style.display = 'none';
+    }
+  } else {
+    notice.style.display = 'none';
+  }
+}
+
+function generate() {
+  const text = document.getElementById('input-text').value.trim();
+  if (!text) { showToast('⚠️ テキストを入力してください'); return; }
+
+  if (createType === 'qr') {
+    generateQR(text);
+  } else {
+    generateBarcode(text);
+  }
+}
+
+function generateQR(text) {
+  document.getElementById('qr-output-wrap').style.display = 'none';
+  document.getElementById('barcode-output-wrap').style.display = 'none';
+
+  const container = document.getElementById('qr-output');
+  container.innerHTML = '';
+
+  try {
+    qrCodeInstance = new QRCode(container, {
+      text: text,
+      width: 256,
+      height: 256,
+      colorDark: '#000000',
+      colorLight: '#ffffff',
+      correctLevel: QRCode.CorrectLevel.H
+    });
+    document.getElementById('qr-output-wrap').style.display = 'flex';
+    showToast('✅ QRコードを生成しました');
+  } catch(e) {
+    showToast('❌ QRコードの生成に失敗しました');
+  }
+}
+
+function generateBarcode(text) {
+  document.getElementById('qr-output-wrap').style.display = 'none';
+  document.getElementById('barcode-output-wrap').style.display = 'none';
+
+  const fmt = document.getElementById('barcode-format').value;
+  const svg = document.getElementById('barcode-svg');
+
+  try {
+    JsBarcode(svg, text, {
+      format: fmt,
+      lineColor: '#000',
+      width: 2,
+      height: 80,
+      displayValue: true,
+      font: 'monospace',
+      fontSize: 14,
+      margin: 10,
+      background: '#ffffff'
+    });
+    document.getElementById('barcode-output-wrap').style.display = 'flex';
+    showToast('✅ バーコードを生成しました');
+  } catch(e) {
+    showToast('❌ バーコードの生成に失敗しました。入力内容を確認してください。');
+  }
+}
+
+// ===== コピー / ダウンロード =====
+function getCanvas(type) {
+  return new Promise((resolve, reject) => {
+    if (type === 'qr') {
+      setTimeout(() => {
+        const img = document.querySelector('#qr-output img');
+        const canvas = document.querySelector('#qr-output canvas');
+        if (canvas) { resolve(canvas); return; }
+        if (img) {
+          const c = document.createElement('canvas');
+          c.width = img.naturalWidth || img.width;
+          c.height = img.naturalHeight || img.height;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          resolve(c);
+          return;
+        }
+        reject('canvas not found');
+      }, 100);
+    } else {
+      const svg = document.getElementById('barcode-svg');
+      const serializer = new XMLSerializer();
+      const svgStr = serializer.serializeToString(svg);
+      const blob = new Blob([svgStr], {type:'image/svg+xml'});
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = img.width || 400;
+        c.height = img.height || 120;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, c.width, c.height);
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        resolve(c);
+      };
+      img.onerror = () => reject('svg load error');
+      img.src = url;
+    }
+  });
+}
+
+async function copyCode(type) {
+  try {
+    const canvas = await getCanvas(type);
+    canvas.toBlob(async (blob) => {
+      try {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': blob })
+        ]);
+        showToast('📋 クリップボードにコピーしました');
+      } catch(e) {
+        showToast('⚠️ コピーできませんでした（ブラウザ制限）');
+      }
+    }, 'image/png');
+  } catch(e) {
+    showToast('❌ コピーに失敗しました');
+  }
+}
+
+async function downloadCode(type) {
+  try {
+    const canvas = await getCanvas(type);
+    const link = document.createElement('a');
+    link.download = type === 'qr' ? 'qrcode.png' : 'barcode.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    showToast('⬇️ ダウンロードしました');
+  } catch(e) {
+    showToast('❌ ダウンロードに失敗しました');
+  }
+}
+
+// ===== 読み取りセクション =====
+function setReadType(type) {
+  readType = type;
+  document.getElementById('read-qr-btn').classList.toggle('active', type === 'qr');
+  document.getElementById('read-bar-btn').classList.toggle('active', type === 'barcode');
+  stopCamera();
+  document.getElementById('result-box').style.display = 'none';
+  document.getElementById('copy-result-btn').style.display = 'none';
+}
+
+async function startCamera() {
+  stopCamera();
+  document.getElementById('result-box').style.display = 'none';
+  document.getElementById('copy-result-btn').style.display = 'none';
+
+  const videoEl = document.getElementById('video');
+  const videoContainer = document.getElementById('video-container');
+  const stopBtn = document.getElementById('stop-btn');
+
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    });
+    videoEl.srcObject = videoStream;
+    await videoEl.play();
+    videoContainer.style.display = 'block';
+    stopBtn.style.display = 'inline-block';
+
+    const hints = new Map();
+    const formats = [];
+
+    if (readType === 'qr') {
+      formats.push(ZXing.BarcodeFormat.QR_CODE);
+    } else {
+      formats.push(
+        ZXing.BarcodeFormat.CODE_128,
+        ZXing.BarcodeFormat.EAN_13,
+        ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.UPC_A,
+        ZXing.BarcodeFormat.CODE_39,
+        ZXing.BarcodeFormat.ITF,
+        ZXing.BarcodeFormat.DATA_MATRIX
+      );
+    }
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+
+    codeReader = new ZXing.BrowserMultiFormatReader(hints);
+
+    codeReader.decodeFromVideoElement(videoEl, (result, err) => {
+      if (result) {
+        showResult(result.getText());
+        stopCamera();
+      }
+    });
+
+    showToast('📷 カメラを起動しました');
+  } catch(e) {
+    showToast('❌ カメラにアクセスできませんでした');
+  }
+}
+
+function stopCamera() {
+  if (codeReader) {
+    try { codeReader.reset(); } catch(e) {}
+    codeReader = null;
+  }
+  if (videoStream) {
+    videoStream.getTracks().forEach(t => t.stop());
+    videoStream = null;
+  }
+  const videoEl = document.getElementById('video');
+  videoEl.srcObject = null;
+  document.getElementById('video-container').style.display = 'none';
+  document.getElementById('stop-btn').style.display = 'none';
+}
+
+function readFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      const hints = new Map();
+      const formats = [];
+      if (readType === 'qr') {
+        formats.push(ZXing.BarcodeFormat.QR_CODE);
+      } else {
+        formats.push(
+          ZXing.BarcodeFormat.CODE_128,
+          ZXing.BarcodeFormat.EAN_13,
+          ZXing.BarcodeFormat.EAN_8,
+          ZXing.BarcodeFormat.UPC_A,
+          ZXing.BarcodeFormat.CODE_39,
+          ZXing.BarcodeFormat.ITF,
+          ZXing.BarcodeFormat.DATA_MATRIX
+        );
+      }
+      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+
+      const multiReader = new ZXing.BrowserMultiFormatReader(hints);
+      const luminanceSource = new ZXing.RGBLuminanceSource(imageData.data, canvas.width, canvas.height);
+      const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
+
+      try {
+        const result = multiReader.decode(binaryBitmap);
+        showResult(result.getText());
+      } catch(err) {
+        showToast('❌ コードを読み取れませんでした');
+      }
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+function showResult(text) {
+  document.getElementById('result-text').textContent = text;
+  document.getElementById('result-box').style.display = 'block';
+  document.getElementById('copy-result-btn').style.display = 'inline-block';
+  showToast('✅ 読み取り成功！');
+}
+
+function copyResult() {
+  const text = document.getElementById('result-text').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    showToast('📋 結果をコピーしました');
+  }).catch(() => {
+    showToast('⚠️ コピーできませんでした');
+  });
+}
+
+// ===== トースト =====
+let toastTimer = null;
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
+}
+
+// バーコード形式変更時にチェック
+document.getElementById('barcode-format') && document.getElementById('barcode-format').addEventListener('change', onInputChange);
+</script>
+</body>
+</html>
